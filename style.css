@@ -1,0 +1,567 @@
+/* Base Variables */
+:root {
+    --color-dark-forest: #0a1a0f;
+    /* Deep green-black */
+    --color-lighter-dark: #112215;
+    --color-off-white: #e0e0e0;
+    --color-accent-green: #4ade80;
+    /* Tailwind brand green */
+    --color-accent-red: #ef4444;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --font-heading: 'Noto Sans TC', sans-serif;
+    --font-body: 'Inter', sans-serif;
+}
+
+/* Reset & Base */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: var(--color-dark-forest);
+    color: var(--color-off-white);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+.logo {
+    font-family: var(--font-heading);
+}
+
+/* Utility Classes (Simulating Tailwind roughly) */
+.fixed {
+    position: fixed;
+}
+
+.relative {
+    position: relative;
+}
+
+.absolute {
+    position: absolute;
+}
+
+.sticky {
+    position: sticky;
+}
+
+.top-0 {
+    top: 0;
+}
+
+.w-full {
+    width: 100%;
+}
+
+.h-screen {
+    height: 100vh;
+}
+
+.min-h-screen {
+    min-height: 100vh;
+}
+
+.z-50 {
+    z-index: 50;
+}
+
+.z-10 {
+    z-index: 10;
+}
+
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+}
+
+.text-3xl {
+    font-size: 1.875rem;
+}
+
+.text-4xl {
+    font-size: 2.25rem;
+}
+
+.text-5xl {
+    font-size: 3rem;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.p-6 {
+    padding: 1.5rem;
+}
+
+.px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.py-20 {
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem;
+}
+
+.mb-8 {
+    margin-bottom: 2rem;
+}
+
+.mt-4 {
+    margin-top: 1rem;
+}
+
+.mt-8 {
+    margin-top: 2rem;
+}
+
+.mt-12 {
+    margin-top: 3rem;
+}
+
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.hidden {
+    display: none;
+}
+
+.block {
+    display: block;
+}
+
+/* Colors */
+.bg-dark-forest {
+    background-color: var(--color-dark-forest);
+}
+
+.bg-lighter-dark {
+    background-color: var(--color-lighter-dark);
+}
+
+.bg-black {
+    background-color: #000;
+}
+
+.text-off-white {
+    color: var(--color-off-white);
+}
+
+.text-green-400 {
+    color: var(--color-accent-green);
+}
+
+.text-red-400 {
+    color: var(--color-accent-red);
+}
+
+/* Custom Components & Effects */
+
+.flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.mix-blend-difference {
+    mix-blend-mode: difference;
+    color: white;
+    /* Ensure visibility */
+}
+
+/* Navigation */
+.menu-items a {
+    text-decoration: none;
+    color: inherit;
+    transition: color 0.3s;
+}
+
+.menu-items a:hover {
+    color: var(--color-accent-green);
+}
+
+/* Intro Section */
+.perspective-container {
+    perspective: 1000px;
+    overflow: hidden;
+}
+
+.layer-bg,
+.layer-mid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+}
+
+.layer-bg {
+    background-image: url('hero_bg.png');
+    z-index: 0;
+    opacity: 0.5;
+}
+
+.layer-mid {
+    /* Placeholder for mid layer if exists */
+    background: radial-gradient(circle at center, transparent 0%, var(--color-dark-forest) 90%);
+    z-index: 1;
+}
+
+/* Snake Visual Sticky Logic */
+.snake-story-block {
+    position: relative;
+}
+
+/* Important: The visual needs to be sticky within the block */
+.sticky-visual {
+    position: sticky;
+    /* Make it sticky */
+    top: 20vh;
+    /* Stick 20vh from top */
+    height: 60vh;
+    /* Constrain height */
+    align-self: flex-start;
+    /* Align to top of flex container */
+}
+
+/* Snake Images */
+.snake-visual img {
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    max-height: 100%;
+}
+
+.snake-visual .visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.snake-visual .hidden {
+    opacity: 0;
+    transform: scale(0.95);
+    display: block;
+    visibility: hidden;
+}
+
+/* Overriding display:none for transition */
+.snake-visual .hidden.active-state {
+    opacity: 1;
+    transform: scale(1);
+    visibility: visible;
+}
+
+/* Custom toggle class helper */
+
+/* Dialogue Box Glassmorphism */
+/* 對話框樣式：磨砂玻璃質感 */
+.dialogue-box {
+    background: rgba(255, 255, 255, 0.1);
+    /* 半透明 */
+    backdrop-filter: blur(10px);
+    /* 模糊背景 */
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    font-family: 'Courier New', monospace;
+    /* 使用等寬字體更有打字機感 */
+    line-height: 1.6;
+    min-height: 100px;
+    /* 固定高度避免文字跳動 */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.misconception-tag {
+    display: inline-block;
+    background: rgba(127, 29, 29, 0.5);
+    color: #fecaca;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Interaction Section */
+.interactive-ruler-game {
+    width: 100%;
+    margin-top: 2rem;
+}
+
+/* Animations */
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translateX(-5px);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translateX(5px);
+    }
+}
+
+.shake-anim {
+    animation: shake 0.6s cubic-bezier(.36, .07, .19, .97) both;
+    animation-play-state: paused;
+    /* Trigger via JS */
+}
+
+@keyframes float {
+    0% {
+        transform: translateY(0px) rotate(-6deg);
+    }
+
+    50% {
+        transform: translateY(-15px) rotate(-6deg);
+    }
+
+    100% {
+        transform: translateY(0px) rotate(-6deg);
+    }
+}
+
+.float-anim {
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(-25%);
+        animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+
+    50% {
+        transform: none;
+        animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+}
+
+.animate-bounce {
+    animation: bounce 1s infinite;
+}
+
+/* Typing Effect Cursor */
+/* Typing Effect Cursor */
+.typing-cursor::after {
+    content: '|';
+    animation: blink 1s step-start infinite;
+    color: #FACC15;
+    /* Brand Yellow */
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+/* Range Input Styling */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: var(--color-accent-green);
+    cursor: pointer;
+    margin-top: -10px;
+    /* You need to specify a margin in Chrome, but in Firefox and IE it is automatic */
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+}
+
+/* Responsive */
+@media (min-width: 768px) {
+    .md\:w-1\/2 {
+        width: 50%;
+    }
+
+    .md\:flex-row {
+        flex-direction: row;
+    }
+}
+
+/* --- Lanyard Trigger Styles --- */
+.lanyard-container {
+    position: fixed;
+    top: 0;
+    left: 5%;
+    /* Moved to Left */
+    z-index: 2000;
+    filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5));
+    cursor: grab;
+    transform-origin: top center;
+    /* Critical for pendulum swing */
+    /* Add padding to create the "string" length and allow grabbing the wire */
+    padding-top: 100px;
+    padding-bottom: 20px;
+}
+
+.lanyard-container:active {
+    cursor: grabbing;
+}
+
+
+/* Lanyard String (The Cord) */
+.lanyard-string {
+    width: 2px;
+    height: calc(150vh + 100px);
+    /* 150vh above + 100px visible */
+    /* Ends exactly at the anchor point */
+    background: rgba(255, 255, 255, 0.3);
+    position: absolute;
+    top: -150vh;
+    /* Start far above, end at 100px (padding-top) */
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+    z-index: -1;
+    /* Ensure behind card */
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.1));
+}
+
+.lanyard-card {
+    background: rgba(20, 20, 25, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 10px;
+    /* Padding for the card */
+    border-radius: 10px;
+    width: 120px;
+    /* Width of the logo card */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    /* top: -5px; Removed to let flow naturally after padding */
+}
+
+/* --- Menu Overlay Styles (Slide Down) --- */
+.menu-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: var(--color-dark-forest);
+    z-index: 1500;
+    /* Behind the lanyard but above content */
+    transform: translateY(-100%);
+    /* Start hidden above */
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    /* Ease-out quart-like */
+    display: flex;
+    flex-direction: column;
+}
+
+.menu-overlay.open {
+    transform: translateY(0%);
+}
+
+.menu-header {
+    padding: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 1010;
+    /* Hide the header logo inside menu since we have the lanyard, 
+        OR we can keep it as a branding reinforcement. 
+        Let's keep it but maybe align it differently. */
+}
+
+/* Menu Navigation Links (Overlay) */
+.menu-nav {
+    /* Removed absolute positioning for flex centering */
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    text-align: center;
+}
+
+.menu-nav-item {
+    font-family: var(--font-heading);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.menu-nav-item:hover {
+    color: var(--color-accent-green);
+    transform: scale(1.1);
+    /* Slight zoom instead of padding shift */
+    letter-spacing: 0.2em;
+    /* Expand text */
+}
+
+/* Removed Carousel Styles */

@@ -1,0 +1,2330 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>它說 The Serpent's Voice</title>
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            alert("Error: " + msg + "\nLine: " + line + "\nCol: " + col);
+            console.error(msg, error);
+            // Optionally append to body to see it if alert is blocked
+            var div = document.createElement("div");
+            div.style.position = "fixed";
+            div.style.top = "0";
+            div.style.left = "0";
+            div.style.background = "red";
+            div.style.color = "white";
+            div.style.zIndex = "99999";
+            div.innerText = "JS Error: " + msg + " (L" + line + ")";
+            document.body.appendChild(div);
+        };
+    </script>
+
+    <!-- React & Tailwind -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- GSAP Animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;500;900&family=Space+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./style.css">
+
+    <style>
+        .falling-text-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .falling-text-target {
+            display: inline-block;
+        }
+
+        .word {
+            display: inline-block;
+            margin: 0 5px;
+            user-select: none;
+            white-space: nowrap;
+            color: #444;
+            /* Default dark */
+        }
+
+        /* Large Physics Titles */
+        .word[data-word="DOWNLOAD"],
+        .word[data-word="APP"] {
+            font-size: 5rem;
+            font-weight: 900;
+            color: #ffffff;
+            letter-spacing: -2px;
+            z-index: 10;
+        }
+
+        .word[data-word="AVAILABLE"],
+        .word[data-word="ON"],
+        .word[data-word="IOS"],
+        .word[data-word="&"],
+        .word[data-word="ANDROID"] {
+            font-size: 1rem;
+            color: #f97316;
+            font-family: monospace;
+            margin-top: 10px;
+        }
+
+        .highlighted {
+            color: #f97316;
+            /* Orange */
+            font-weight: bold;
+        }
+
+        .falling-text-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #0F1115;
+            color: #E8E6D9;
+            overflow-x: hidden;
+        }
+
+        /* 1. 噪點紋理 */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.08;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* 2. 漂浮動畫 */
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px) rotate(0deg);
+            }
+
+            50% {
+                transform: translateY(-15px) rotate(1deg);
+            }
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .delay-1 {
+            animation-delay: 1s;
+        }
+
+        .delay-2 {
+            animation-delay: 2s;
+        }
+
+        /* 3. 卡片切換動畫 */
+        .card-enter {
+            animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        /* 4. 垂直文字 */
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            letter-spacing: 0.3em;
+        }
+
+        /* 5. 新增：文字滑入動畫 */
+        .animate-slide-up {
+            opacity: 0;
+            animation: slideUpFade 0.6s ease-out forwards;
+        }
+
+        @keyframes slideUpFade {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 0px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useEffect, useState, useRef, useMemo } = React;
+
+        // Register GSAP plugins globally to ensure availability for all components
+        if (window.gsap && window.ScrollTrigger) {
+            window.gsap.registerPlugin(window.ScrollTrigger);
+        }
+
+        // --- Icons (Inline SVGs) ---
+        const IconBase = ({ children, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+
+        const Scan = (props) => <IconBase {...props}><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /></IconBase>;
+        const BookOpen = (props) => <IconBase {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></IconBase>;
+        const Ruler = (props) => <IconBase {...props}><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0l12.6 12.6z" /><line x1="13" y1="7" x2="14.4" y2="8.4" /><line x1="16" y1="10" x2="17.4" y2="11.4" /><line x1="19" y1="13" x2="20.4" y2="14.4" /><line x1="10" y1="4" x2="11.4" y2="5.4" /></IconBase>;
+        const Puzzle = (props) => <IconBase {...props}><path d="M19.439 15.424a1 1 0 0 0-1.026 1.054 2.477 2.477 0 0 1-2.478 2.378H15a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h.935a2.477 2.477 0 0 1 2.478 2.378 1 1 0 0 0 1.96...039c.2-.562.775-.89 1.341-.75L19.44 15.424z" /><path d="M12 21v-4" /><path d="M12 7V3" /><path d="M3 12h4" /><path d="M21 12h-4" /><circle cx="12" cy="12" r="3" /></IconBase>; // Simplified for puzzle
+        // Let's use a simpler Puzzle path to avoid error manually typing complex paths
+        const PuzzleSimple = (props) => <IconBase {...props}><path d="M19.5 14.5h-5v-5h5v5z" /><path d="M9.5 9.5h-5v5h5v-5z" /><path d="M14.5 19.5h-5v-5h5v5z" /><path d="M14.5 9.5h-5v-5h5v5z" /></IconBase>;
+
+        const Smartphone = (props) => <IconBase {...props}><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></IconBase>;
+        const ChevronRight = (props) => <IconBase {...props}><path d="m9 18 6-6-6-6" /></IconBase>;
+        const ChevronLeft = (props) => <IconBase {...props}><path d="m15 18-6-6 6-6" /></IconBase>;
+        const MapPin = (props) => <IconBase {...props}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></IconBase>;
+        const X = (props) => <IconBase {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></IconBase>;
+
+        // --- 元件：Gooey Blob Cursor (液態游標 - 進階物理版) ---
+        const GooeyCursor = () => {
+            const [trail, setTrail] = useState([]);
+
+            // 初始化拖尾數量
+            useEffect(() => {
+                setTrail(Array.from({ length: 5 }).map((_, i) => ({
+                    id: i,
+                    x: -100,
+                    y: -100
+                })));
+            }, []);
+
+            useEffect(() => {
+                const handleMouseMove = (e) => {
+                    // 更新主游標 (第一個點) 立即跟隨
+                    setTrail(prev => {
+                        const newTrail = [...prev];
+                        if (newTrail[0]) {
+                            newTrail[0].x = e.clientX;
+                            newTrail[0].y = e.clientY;
+                        }
+                        return newTrail;
+                    });
+                };
+
+                // 動畫迴圈：讓後面的點跟隨前面的點 (Lerp)
+                let animationFrameId;
+                const animateTrail = () => {
+                    setTrail(prev => {
+                        const newTrail = [...prev];
+                        for (let i = 1; i < newTrail.length; i++) {
+                            const leader = newTrail[i - 1];
+                            const follower = newTrail[i];
+
+                            // 物理跟隨公式：目前位置 += (目標位置 - 目前位置) * 延遲係數
+                            follower.x += (leader.x - follower.x) * 0.3; // 0.3 = 跟隨速度
+                            follower.y += (leader.y - follower.y) * 0.3;
+                        }
+                        return newTrail;
+                    });
+                    animationFrameId = requestAnimationFrame(animateTrail);
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+                animationFrameId = requestAnimationFrame(animateTrail);
+
+                return () => {
+                    window.removeEventListener('mousemove', handleMouseMove);
+                    cancelAnimationFrame(animationFrameId);
+                };
+            }, []);
+
+            return (
+                <>
+                    <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+                        <defs>
+                            <filter id="goo">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+                                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -10" result="goo" />
+                                <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+                            </filter>
+                        </defs>
+                    </svg>
+                    <div
+                        className="fixed top-0 left-0 w-full h-full pointer-events-none z-[9999] mix-blend-exclusion"
+                        style={{ filter: 'url(#goo)' }}
+                    >
+                        {trail.map((point, index) => (
+                            <div
+                                key={point.id}
+                                className="absolute bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2"
+                                style={{
+                                    left: point.x,
+                                    top: point.y,
+                                    width: index === 0 ? '20px' : `${20 - index * 3}px`, // 越後面越小
+                                    height: index === 0 ? '20px' : `${20 - index * 3}px`,
+                                    opacity: 1 // (index === 0 ? 1 : 0.8)
+                                }}
+                            />
+                        ))}
+                    </div>
+                </>
+            );
+        };
+
+        // --- Component: Noise (Animated Grain Effect) ---
+        const Noise = ({
+            patternSize = 250,
+            patternScaleX = 1,
+            patternScaleY = 1,
+            patternRefreshInterval = 2,
+            patternAlpha = 15
+        }) => {
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                let w, h;
+                let frame = 0;
+                let animationId;
+
+                const resize = () => {
+                    w = window.innerWidth;
+                    h = window.innerHeight;
+                    canvas.width = w;
+                    canvas.height = h;
+                };
+
+                // Resize observer or simple event listener
+                window.addEventListener('resize', resize);
+                resize();
+
+                const loop = () => {
+                    frame++;
+
+                    // Skip frames for "RefreshInterval" effect
+                    if (frame % patternRefreshInterval === 0) {
+                        // 1. Create a pattern on the fly (or reuse a buffer if optimizing, but for "static" random noise we need regen)
+                        // To animate noise, we must regenerate the random values.
+                        const pCanvas = document.createElement('canvas');
+                        pCanvas.width = patternSize;
+                        pCanvas.height = patternSize;
+                        const pCtx = pCanvas.getContext('2d');
+
+                        const imageData = pCtx.createImageData(patternSize, patternSize);
+                        const data = imageData.data;
+
+                        for (let i = 0; i < data.length; i += 4) {
+                            const val = Math.random() * 255;
+                            data[i] = val;     // R
+                            data[i + 1] = val;   // G
+                            data[i + 2] = val;   // B
+                            data[i + 3] = patternAlpha; // Alpha 0-255
+                        }
+
+                        pCtx.putImageData(imageData, 0, 0);
+
+                        // 2. Draw pattern to main canvas
+                        ctx.clearRect(0, 0, w, h);
+                        ctx.save();
+                        ctx.scale(patternScaleX, patternScaleY);
+                        // Start pattern from random offset to avoid grid-lock feel if desired? 
+                        // Or just repeat. Standard noise usually just repeats.
+                        const pattern = ctx.createPattern(pCanvas, 'repeat');
+                        ctx.fillStyle = pattern;
+                        ctx.fillRect(0, 0, w / patternScaleX, h / patternScaleY);
+                        ctx.restore();
+                    }
+
+                    animationId = requestAnimationFrame(loop);
+                };
+
+                loop();
+
+                return () => {
+                    window.removeEventListener('resize', resize);
+                    cancelAnimationFrame(animationId);
+                };
+            }, [patternSize, patternScaleX, patternScaleY, patternRefreshInterval, patternAlpha]);
+
+            return (
+                <canvas
+                    ref={canvasRef}
+                    className="fixed inset-0 z-[-1] pointer-events-none opacity-60"
+                    style={{ backgroundColor: '#0F1115' }} // Base dark color
+                />
+            );
+        };
+
+
+        // --- 元件：Hero Section (主視覺與探照燈互動) ---
+        const HeroSection = () => {
+            const [trail, setTrail] = useState([]);
+            const containerRef = useRef(null);
+
+            // 初始化拖尾數量 (更多的點以形成連貫的 Blob)
+            useEffect(() => {
+                setTrail(Array.from({ length: 15 }).map((_, i) => ({ x: -500, y: -500 })));
+            }, []);
+
+            useEffect(() => {
+                const handleMouseMove = (e) => {
+                    const rect = containerRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    // 更新第一個點 (主游標)
+                    setTrail(prev => {
+                        const newTrail = [...prev];
+                        if (newTrail[0]) { newTrail[0].x = x; newTrail[0].y = y; }
+                        return newTrail;
+                    });
+                };
+
+                let animationFrameId;
+                const animateTrail = () => {
+                    setTrail(prev => {
+                        const newTrail = [...prev];
+                        for (let i = 1; i < newTrail.length; i++) {
+                            const leader = newTrail[i - 1];
+                            const follower = newTrail[i];
+
+                            // 物理跟隨 (更緊湊的跟隨以形成實心感)
+                            follower.x += (leader.x - follower.x) * 0.4;
+                            follower.y += (leader.y - follower.y) * 0.4;
+                        }
+                        return newTrail;
+                    });
+                    animationFrameId = requestAnimationFrame(animateTrail);
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+                animationFrameId = requestAnimationFrame(animateTrail);
+
+                return () => {
+                    window.removeEventListener('mousemove', handleMouseMove);
+                    cancelAnimationFrame(animationFrameId);
+                };
+            }, []);
+
+            // 動態產生 Mask Image 字串
+            const getMaskImage = () => {
+                // 組合多個 radial-gradient 來形成 Blob 形狀
+                const gradients = trail.map((point, i) => {
+                    const size = 150 - i * 5; // 漸縮的大小
+                    return `radial-gradient(circle ${size}px at ${point.x}px ${point.y}px, black 100%, transparent 0)`;
+                });
+                return gradients.join(', ');
+            };
+
+            // Base wrapper for hero text
+            // Note: Hero text is at the top, so it will animate immediately on load if visible.
+            return (
+                <section
+                    id="section-hero"
+                    ref={containerRef}
+                    className="relative h-screen flex justify-center items-center overflow-hidden"
+                >
+                    {/* 背景圖：封面封底 (Reveal Layer) */}
+                    <div
+                        className="absolute inset-0 z-0"
+                        style={{
+                            maskImage: getMaskImage(),
+                            WebkitMaskImage: getMaskImage(),
+                            opacity: 0.8
+                        }}
+                    >
+                        <img
+                            src="封面封底(1).png"
+                            alt="Theme Background"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+
+                    {/* 默認背景 (Dark Overlay) */}
+                    <div className="absolute inset-0 bg-[#0F1115] -z-10 opacity-100"></div>
+
+                    {/* 文字內容區 */}
+                    <ScrollReveal className="relative z-10 text-center px-4 flex flex-col items-center pointer-events-none">
+                        <div className="absolute inset-0 flex justify-center items-center -z-10">
+                            <h1 className="text-[25vw] font-black tracking-tighter text-white opacity-[0.02]">VOICE</h1>
+                        </div>
+
+                        <div className="mb-6 flex items-center justify-center gap-4 animate-pulse">
+                            <span className="h-[1px] w-8 bg-green-500"></span>
+                            <span className="text-xs tracking-[0.4em] text-green-400 font-mono">LISTEN</span>
+                            <span className="h-[1px] w-8 bg-green-500"></span>
+                        </div>
+                        <img
+                            src="./它說字體3外框.png"
+                            alt="它說 Logo"
+                            className="w-64 md:w-96 mb-8 filter drop-shadow-2xl"
+                        />
+                        <p className="text-gray-400 tracking-widest">聽見森林的聲音</p>
+                        <p className="text-xs text-gray-600 mt-4 animate-bounce">
+                            MOVE CURSOR TO EXPLORE
+                        </p>
+                    </ScrollReveal>
+                </section>
+            );
+        };
+
+        // --- 元件：幾何蛇插畫 (與網頁一致) ---
+        const snakes = [
+            {
+                id: 1,
+                name: "赤尾青竹絲",
+                eng: "Bamboo Viper",
+                maxLength: 90,
+                color: "#A3E635",
+                habitat: "潮濕的山區樹林、竹林",
+                plants: "竹葉、姑婆芋",
+                intro: "我是台灣咬人紀錄最多的蛇，但我不是故意的啦！因為我全身都是翠綠色的，躲在樹叢裡根本沒人看得到，所以去山上玩的人很容易不小心碰到我。我有個外號叫『赤尾鮐』，因為我的尾巴是磚紅色的。我是個『坐著等』的獵人，可以維持同一個姿勢好久好久，動都不動，直到青蛙經過，我才『咻』地衝出去！",
+                features: {
+                    nickname: "紅眼忍者 / 赤尾鮐", // Updated nickname
+                    pattern: "全身翠綠，側面有一條白色的細線（有的還有紅線），尾巴末端是紅色的。", // Updated pattern
+                    body: "三角形的頭，紅色的眼睛，鼻子旁邊還有個感熱的『頰窩』。" // Updated body
+                },
+                secret: "我雖然有毒（出血性），但是毒性並沒有很強，只要趕快就醫，通常不會有生命危險。我是胎生的蛇媽媽喔。",
+                stats: { toxicity: 3, camouflage: 5, patience: 5, quantity: 5, temper: 3, size: 2 },
+                statLabels: ["毒性", "偽裝", "定力", "數量", "脾氣", "體型"],
+                layers: [
+                    "./赤尾青竹絲/1背景黑.jpg",
+                    "./赤尾青竹絲/2背景.png",
+                    "./赤尾青竹絲/3後植物.png",
+                    "./赤尾青竹絲/4後植物2.png",
+                    "./赤尾青竹絲/5蛇.png",
+                    "./赤尾青竹絲/6前植物.png"
+                ]
+            },
+            {
+                id: 2,
+                name: "中華眼鏡蛇",
+                eng: "Chinese Cobra",
+                maxLength: 150,
+                color: "#60A5FA",
+                habitat: "灌叢、農墾地",
+                plants: "芒草、闊葉草",
+                intro: "嘶——！誰敢惹我？生氣的時候，我會把上半身挺得直直的，頸部像扇子一樣張開，看起來是不是很像戴了一副眼鏡？這就是我名字的由來——眼鏡蛇。我是台灣著名的毒蛇，雖然大家都很怕我，但我其實只想要警告你：『離我遠一點！』除非你靠太近或踩到我，不然我只會站著嚇唬你而已。",
+                features: {
+                    nickname: "飯匙倩 / 戴眼鏡的國王",
+                    pattern: "頸部：生氣時會撐開成扁扁的形狀，背面有像眼鏡（或是白色環紋）的圖案。",
+                    body: "聲音：生氣時會發出響亮的噴氣聲。"
+                },
+                secret: "雖然我很兇，但我可是很有愛心的媽媽，會親自保護我的蛋寶寶喔！",
+                stats: { toxicity: 5, intimidation: 5, temper: 4, size: 4, adaptability: 5, maternal_care: 5 },
+                statLabels: ["毒性", "威嚇", "脾氣", "體型", "適應力", "護卵"],
+                layers: [
+                    "./眼鏡蛇/1黑底.png",
+                    "./眼鏡蛇/2背景.png",
+                    "./眼鏡蛇/3後植物.png",
+                    "./眼鏡蛇/4後植物.png",
+                    "./眼鏡蛇/5後植物.png",
+                    "./眼鏡蛇/6蛇.png",
+                    "./眼鏡蛇/7蛇中間植物.png",
+                    "./眼鏡蛇/8前植物.png"
+                ]
+            },
+            {
+                id: 3,
+                name: "百步蛇",
+                eng: "Hundred Pacer",
+                maxLength: 120,
+                color: "#F87171",
+                habitat: "原始闊葉林底層",
+                plants: "落葉堆、蕨類",
+                intro: "我是排灣族和魯凱族最尊敬的『守護神』。傳說中，我曾守護著古陶壺，保護排灣族祖先在裡面誕生喔！你有發現我的吻端尖尖翹翹的嗎？那常被形容為短小的鱗角。就是因為這個翹翹的特徵，人類又叫我『尖吻蝮』。我最喜歡下雨天，當雨水滴滴答答的時候，就是我出來散步的時候。我不喜歡追著獵物跑，而是喜歡安靜地守株待兔。躲在落葉堆裡，等老鼠自己送上門，再用全世界最快的速度——咬住牠！",
+                features: {
+                    nickname: "山神之子 / 陶壺守護者 (二級保育)",
+                    pattern: "背上有一連串三角形花紋，裡面有像鮭魚肉一樣的顏色。",
+                    body: "吻端尖翹 (翹鼻子)，臉頰有熱感應器『頰窩』。"
+                },
+                secret: "雖然我不會讓你走一百步就倒下，但我一次注入的毒液量非常驚人！千萬不要靠近我！",
+                stats: { toxicity: 5, sense: 5, camouflage: 5, temper: 3, rarity: 4, size: 5 },
+                statLabels: ["毒性", "感知", "偽裝", "脾氣", "稀有", "體型"],
+                layers: [
+                    "./百步蛇/1地板.png",
+                    "./百步蛇/2後植物.png",
+                    "./百步蛇/3山蘇.png",
+                    "./百步蛇/4地上落葉.png",
+                    "./百步蛇/5蛇.png",
+                    "./百步蛇/6前植物.png"
+                ]
+            },
+            {
+                id: 4,
+                name: "鎖鏈蛇",
+                eng: "Russell's Viper",
+                maxLength: 100,
+                color: "#FBBF24",
+                habitat: "河床、礫石地",
+                plants: "乾枯雜草、石礫",
+                intro: "嘶——嘶——！你聽到了嗎？這是像壓力鍋洩氣一樣大聲的聲音。這是在警告你：『別過來！』 我的脾氣不太好，因為我動作比較慢，所以遇到威脅時，我會把身體蜷成 S 型，頭仰得高高的，準備隨時發動攻擊！我雖然爬得慢，但我攻擊的速度可是全台灣最快的！我咬住獵物的時候非常用力，而且會緊緊咬住不放，絕對不讓獵物逃走！",
+                features: {
+                    nickname: "暴躁的甜甜圈 (二級保育)",
+                    pattern: "背部有一圈一圈的橢圓形斑紋，好像鐵鍊扣在一起。",
+                    body: "聲音：生氣時會吸一大口氣，然後用力噴出來，發出巨大的『嘶——』聲。"
+                },
+                secret: "和赤腹游蛇一樣，我也是胎生的喔，媽媽一次可以生好多小寶寶（有時候超過 60 隻呢）！我喜歡住在南部和東部（屏東、台東、花蓮）乾乾熱熱的地方。",
+                stats: { toxicity: 5, sound: 5, strike_speed: 5, temper: 5, rarity: 4, size: 3 },
+                statLabels: ["毒性", "聲音", "攻擊速度", "脾氣", "稀有", "體型"],
+                layers: [
+                    "./鎖鏈蛇/1背景.png",
+                    "./鎖鏈蛇/2後面植物.png",
+                    "./鎖鏈蛇/3後面植物.png",
+                    "./鎖鏈蛇/4後面植物.png",
+                    "./鎖鏈蛇/5蛇.png",
+                    "./鎖鏈蛇/6前面植物.png",
+                    "./鎖鏈蛇/7前面石頭.png",
+                    "./鎖鏈蛇/8最前面植物.png"
+                ]
+            },
+            {
+                id: 5,
+                name: "金絲蛇",
+                eng: "Golden Snake",
+                maxLength: 70,
+                color: "#FB923C",
+                habitat: "北部潮濕山區森林",
+                plants: "苔蘚、巨木",
+                intro: "大家好，我是台灣四大美蛇之一，也是全世界只有台灣才有的特有種！我住在北部的森林裡，個子很嬌小（大約 70 公分），個性也很害羞。但我身上的衣服可是最時髦的喔！我的背上有著亮眼的橘紅色與黃色線條，就像鑲了金絲邊一樣漂亮。平常我喜歡在森林底層找青蛙吃，有時候為了找好吃的蝌蚪，我還會努力爬到樹上，鑽進樹洞裡去探險呢！",
+                features: {
+                    nickname: "森林紅寶石 / 宮島氏腹鏈蛇 (一級瀕危)",
+                    pattern: "身體兩側有極為明顯的橘紅色縱紋，配上腹側的黃色線條。",
+                    body: "脖子後方有兩個小白點，那是我的『白色耳環』標誌。"
+                },
+                secret: "我們日行性、動作慢，喜歡在溫暖馬路停留，所以常發生『路殺』意外。我們可是瀕臨絕種的珍貴蛇類，請大家經過山區馬路時多留意我們喔！",
+                stats: { toxicity: 0, beauty: 5, climbing: 3, temper: 1, rarity: 5, size: 1 },
+                statLabels: ["毒性", "顏值", "爬樹", "脾氣", "稀有", "體型"],
+                layers: [
+                    "./金絲蛇/1背景.png",
+                    "./金絲蛇/2後面植物.png",
+                    "./金絲蛇/3後面植物_2.png",
+                    "./金絲蛇/4後面植物.png",
+                    "./金絲蛇/5蛇.png",
+                    "./金絲蛇/6前植物.png"
+                ]
+            },
+            {
+                id: 6,
+                name: "白梅花蛇",
+                eng: "White-spotted Wolf Snake",
+                maxLength: 80,
+                color: "#E8E6D9",
+                habitat: "低海拔次生林",
+                plants: "藤蔓、枯枝",
+                intro: "噓——小聲點！大家都說我長得很像有毒的『雨傘節』，但我可是完全無毒的白梅花蛇喔！我生性比較膽小，容易緊張。如果你嚇到我，我會把身體縮成『S型』，還會用尾巴用力敲地板，裝出一副很兇的樣子 8！但我其實是在虛張聲勢啦。我跟雨傘節最大的不同，就是我有灰灰褐褐的雜色，身上的環紋也是破碎的，不像牠那麼整齊黑白分明喔。",
+                features: {
+                    nickname: "森林裡的模仿演員",
+                    pattern: "黑白相間的環紋，但是邊界破碎，看起來像梅花散落在身上。",
+                    body: "細細長長的，背部有點灰褐色過渡色，越靠近尾巴白色越寬。"
+                },
+                secret: "我是夜貓子（夜行性），最喜歡吃蜥蜴了！雖然我沒有毒，但我很會演戲來保護自己。",
+                stats: { toxicity: 0, acting: 5, guts: 1, speed: 3, climbing: 4, size: 3 },
+                statLabels: ["毒性", "演技", "膽量", "速度", "攀爬", "體型"],
+                layers: [
+                    "./白梅花蛇/1黑色背景.png",
+                    "./白梅花蛇/2背景.png",
+                    "./白梅花蛇/3後面植物.png",
+                    "./白梅花蛇/4後面植物.png",
+                    "./白梅花蛇/5蛇.png",
+                    "./白梅花蛇/6前面植物.png"
+                ]
+            },
+            {
+                id: 7,
+                name: "紅竹蛇",
+                eng: "Red Bamboo Snake",
+                maxLength: 100,
+                color: "#F43F5E",
+                habitat: "山區林道",
+                plants: "野薑花、路邊草叢",
+                intro: "你看過紅色的竹子嗎？那就是我——紅竹蛇！我是山林裡最美麗的紅寶石。我的身體是紅棕色的，上面有一圈一圈黑色的環紋，頭頂還有特別的黑色縱帶。雖然我顏色很鮮豔，但我個性非常害羞溫和，一點也不兇。我也喜歡在晚上的時候出來散步，幫忙抓老鼠吃喔！",
+                features: {
+                    nickname: "紅色竹子 / 紫灰錦蛇",
+                    pattern: "全身紅通通的（紅棕色），配上黑色的寬環紋，非常顯眼。",
+                    body: "頭頂中間有一條黑色的直線，眼睛後面也有一條黑線，這是我的特徵。"
+                },
+                secret: "隨著我長大變老，我身上的黑色環紋會變得越來越不清楚，顏色也會稍微變淡喔。",
+                stats: { toxicity: 0, beauty: 5, temper: 1, stealth: 2, appetite: 3, size: 4 },
+                statLabels: ["毒性", "顏值", "脾氣", "隱蔽", "食量", "體型"],
+                layers: [
+                    "./紅竹/1黑色底.png",
+                    "./紅竹/2藍色背景.png",
+                    "./紅竹/3後1葉子.png",
+                    "./紅竹/4後2葉子.png",
+                    "./紅竹/5後3葉子.png",
+                    "./紅竹/6蛇.png",
+                    "./紅竹/7前面葉子.png",
+                    "./紅竹/8粉紅點點植物.png"
+                ]
+            }
+        ];
+
+        // --- 元件：雷達圖 (Animated) ---
+        const RadarChart = ({ stats, labels, color }) => {
+            const polygonRef = useRef(null);
+            const gridRef = useRef([]);
+            const containerRef = useRef(null);
+
+            // Reset gridRef array on render
+            gridRef.current = [];
+            const addToGridRef = (el) => {
+                if (el && !gridRef.current.includes(el)) {
+                    gridRef.current.push(el);
+                }
+            };
+
+            const size = 100;
+            const center = 100;
+            const radius = 80;
+            const angleStep = (Math.PI * 2) / 6;
+
+            const getKeyPoint = (value, index) => {
+                const angle = index * angleStep - Math.PI / 2;
+                const r = (value / 5) * radius; // 5 is max val
+                return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
+            };
+
+            useEffect(() => {
+                if (!polygonRef.current) return;
+
+                const data = Object.values(stats);
+                const proxy = { value: 0 }; // Animation progress 0 -> 1
+
+                const ctx = gsap.context(() => {
+                    // 1. Grid Animation: Stagger scale out (Keep this, it provides context)
+                    gsap.fromTo(gridRef.current,
+                        { scale: 0, opacity: 0, transformOrigin: "100px 100px" },
+                        {
+                            scale: 1,
+                            opacity: 1,
+                            duration: 0.8,
+                            stagger: 0.05,
+                            ease: "back.out(1.5)"
+                        }
+                    );
+
+                    // 2. Data Polygon Animation: Animate POINTS directly (True spread)
+                    // This creates a "growth" effect where the shape expands but stroke width stays constant
+                    gsap.to(proxy, {
+                        value: 1,
+                        duration: 1.2,
+                        ease: "elastic.out(1, 0.5)",
+                        delay: 0.1,
+                        onUpdate: () => {
+                            // Calculate current points based on progress (proxy.value)
+                            const currentPoints = data.map((v, i) => getKeyPoint(v * proxy.value, i)).join(" ");
+                            if (polygonRef.current) {
+                                polygonRef.current.setAttribute("points", currentPoints);
+                            }
+                        }
+                    });
+
+                    // 3. Fade in opacity
+                    gsap.fromTo(polygonRef.current,
+                        { opacity: 0 },
+                        { opacity: 0.6, duration: 0.4 }
+                    );
+
+                }, containerRef);
+
+                return () => ctx.revert();
+            }, [stats, color]); // Re-run when stats change
+
+            if (!stats) return null;
+            const data = Object.values(stats);
+            const chartLabels = labels || ["毒性", "演技", "膽量", "速度", "攀爬", "體型"];
+
+            const getLabelPoint = (index) => {
+                const angle = index * angleStep - Math.PI / 2;
+                const r = radius + 25; // Slightly more padding
+                return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
+            };
+
+            const points = data.map((v, i) => getKeyPoint(v, i)).join(" ");
+
+            return (
+                <div ref={containerRef} className="w-48 h-48 relative">
+                    <svg viewBox="-30 -30 260 260" className="w-full h-full text-white">
+                        {/* 背景網格 */}
+                        {[1, 2, 3, 4, 5].map(level => (
+                            <polygon
+                                key={level}
+                                ref={addToGridRef}
+                                points={[0, 1, 2, 3, 4, 5].map(i => {
+                                    const angle = i * angleStep - Math.PI / 2;
+                                    const r = (level / 5) * radius;
+                                    return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
+                                }).join(" ")}
+                                fill="none"
+                                stroke="rgba(255,255,255,0.15)"
+                                strokeWidth="1"
+                            />
+                        ))}
+
+                        {/* 數值區域 */}
+                        <polygon
+                            ref={polygonRef}
+                            points={points}
+                            fill={color}
+                            // fillOpacity handled by GSAP
+                            stroke={color}
+                            strokeWidth="3"
+                            style={{ filter: `drop-shadow(0 0 10px ${color})` }} // Add glow
+                        />
+
+                        {/* 標籤 */}
+                        {chartLabels.map((label, i) => {
+                            const p = getLabelPoint(i);
+                            return (
+                                <text
+                                    key={i}
+                                    x={p.x}
+                                    y={p.y}
+                                    fill="currentColor"
+                                    fontSize="14"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="font-mono font-bold opacity-90 shadow-sm"
+                                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
+                                >
+                                    {label}
+                                </text>
+                            );
+                        })}
+                    </svg>
+                </div>
+            );
+        };
+
+        // --- 元件：視差卡片 (Parallax Card) ---
+        const ParallaxCard = ({ layers }) => {
+            const cardRef = useRef(null);
+
+            const handleMouseMove = (e) => {
+                if (!cardRef.current) return;
+                const rect = cardRef.current.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width - 0.5;
+                const y = (e.clientY - rect.top) / rect.height - 0.5;
+
+                cardRef.current.querySelectorAll('.parallax-layer').forEach((layer, index) => {
+                    const speed = (index + 1) * 10; // 不同層不同速度
+                    layer.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+                });
+            };
+
+            const handleMouseLeave = () => {
+                if (!cardRef.current) return;
+                cardRef.current.querySelectorAll('.parallax-layer').forEach(layer => {
+                    layer.style.transform = 'translate(0, 0)';
+                });
+            };
+
+            return (
+                <div
+                    ref={cardRef}
+                    className="w-full h-full relative overflow-hidden rounded-[2rem]"
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
+                >
+                    {/* Add Floating Animation Wrapper */}
+                    <div className="w-full h-full animate-float">
+                        {layers.map((src, i) => (
+                            <img
+                                key={i}
+                                src={src}
+                                className="parallax-layer absolute inset-0 w-full h-full object-contain transition-transform duration-100 ease-out"
+                                style={{ scale: i === 0 ? '1' : '1.1' }} // 背景不動或微動，前景放大以免穿幫
+                                alt={`layer-${i}`}
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SVG 元件區 ---
+
+        // 1. 棲地卡片插畫 (包含蛇與環境)
+        const HabitatIllustration = ({ color, index }) => (
+            <svg viewBox="0 0 500 600" className="w-full h-full">
+                <defs>
+                    <filter id="grain">
+                        <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" />
+                        <feComposite operator="in" in2="SourceGraphic" result="monoNoise" />
+                        <feBlend in="SourceGraphic" in2="monoNoise" mode="multiply" />
+                    </filter>
+                </defs>
+
+                {/* 背景：環境氛圍 (Environment) */}
+                <rect x="50" y="50" width="400" height="500" rx="200" fill={color} fillOpacity="0.05" />
+
+                {/* 裝飾：花草植物 (Plants) - 根據 index 變化位置模擬不同環境 */}
+                <g opacity="0.4" fill={color}>
+                    {/* 左下植物 */}
+                    <path d={`M100,500 Q80,450 60,480 T20,520`} stroke={color} strokeWidth="5" fill="none" />
+                    <circle cx="60" cy="480" r="10" />
+                    <circle cx="80" cy="460" r="8" />
+
+                    {/* 右下植物 */}
+                    <path d={`M400,500 Q420,420 450,450`} stroke={color} strokeWidth="5" fill="none" />
+                    <path d="M420,480 Q450,400 480,420" stroke={color} strokeWidth="5" fill="none" />
+                    <circle cx="450" cy="450" r="15" />
+
+                    {/* 背景懸浮葉片 */}
+                    <circle cx="150" cy="150" r="30" opacity="0.5" />
+                    <circle cx="350" cy="200" r="20" opacity="0.5" />
+                </g>
+
+                {/* 主角：蛇 (Snake) */}
+                <g filter="url(#grain)" transform="translate(250, 300)">
+                    {/* 身體盤據 */}
+                    <path d="M-100,150 C-150,50 150,-50 100,-150"
+                        fill="none" stroke={color} strokeWidth="60" strokeLinecap="round" />
+                    {/* 頭部 */}
+                    <g transform="translate(100, -150)">
+                        <circle r="45" fill={color} />
+                        <circle cx="-15" cy="-10" r="8" fill="#0F1115" />
+                        <circle cx="15" cy="-10" r="8" fill="#0F1115" />
+                    </g>
+                </g>
+            </svg>
+        );
+
+        // 2. 蛇尺
+        const RulerGraphic = () => (
+            <div className="relative w-full max-w-lg h-32 bg-[#E8E6D9] rounded-lg shadow-2xl flex items-center overflow-hidden transform -rotate-3 border-b-4 border-gray-300">
+                <div className="absolute bottom-0 left-0 w-full h-8 border-t-2 border-gray-400 flex justify-between px-6">
+                    {[...Array(25)].map((_, i) => <div key={i} className={`h-full w-px bg-gray-500 ${i % 5 === 0 ? 'h-6' : 'h-3 mt-3'}`}></div>)}
+                </div>
+                <div className="absolute top-4 right-6 font-mono text-xl text-gray-800 font-bold tracking-widest">SNAKE RULER</div>
+            </div>
+        );
+
+        // 3. 繪本
+        const BookGraphic = () => (
+            <div className="relative w-64 h-80 bg-[#1A1C23] rounded-r-2xl border-l-8 border-yellow-600 shadow-2xl transform rotate-6 flex flex-col items-center justify-center p-6 border border-white/10 group">
+                <BookOpen size={48} className="text-yellow-500 mb-6" />
+                <h3 className="text-2xl font-bold text-[#E8E6D9] mb-2">它說</h3>
+                <p className="text-xs text-gray-500 font-mono">STORY BOOK</p>
+                {/* 裝飾書頁 */}
+                <div className="absolute -right-4 top-4 w-4 h-[90%] bg-white/5 rounded-r-lg skew-y-12 transform origin-left"></div>
+            </div>
+        );
+
+        // 4. 拼圖
+        const PuzzleGraphic = () => (
+            <div className="relative w-64 h-64">
+                <div className="absolute top-0 left-0 w-32 h-32 bg-[#2a2d36] rounded-lg transform -rotate-12 border border-white/10 shadow-xl flex items-center justify-center"><Puzzle className="text-red-400" /></div>
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-[#2a2d36] rounded-lg transform rotate-12 border border-white/10 shadow-xl flex items-center justify-center"><div className="w-12 h-12 rounded-full border border-red-400/30"></div></div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-[#1A1C23] rounded-xl border border-white/20 shadow-2xl z-10 flex flex-col items-center justify-center p-4">
+                    <span className="text-xs font-mono text-gray-500 mb-2">PUZZLE</span>
+                    <span className="text-2xl font-bold">立體拼圖</span>
+                </div>
+            </div>
+        );
+
+        // 5. AR 手機
+        const ARPhoneGraphic = () => (
+            <div className="relative w-40 h-80 bg-gray-900 rounded-[2.5rem] border-4 border-gray-700 shadow-2xl flex flex-col items-center justify-center overflow-hidden">
+                <div className="w-full h-full flex items-center justify-center bg-black/50"><Scan size={40} className="text-green-400 animate-pulse" /></div>
+            </div>
+        );
+
+        // --- Component: Snake Ruler Essential (Physical Metaphor) ---
+        const SnakeRulerEssential = ({ currentSnake, snakes, onSwitchSnake }) => {
+            const [length, setLength] = useState(50); // Initial length (cm)
+            const [isDragging, setIsDragging] = useState(false);
+            const rulerRef = useRef(null);
+            const dragRef = useRef({ startX: 0, startY: 0, startLength: 0 });
+            const audioCtxRef = useRef(null);
+            const lastSoundLen = useRef(50);
+
+            // Mobile Detection
+            const [isMobile, setIsMobile] = useState(false);
+            useEffect(() => {
+                const checkMobile = () => setIsMobile(window.innerWidth < 768);
+                checkMobile();
+                window.addEventListener('resize', checkMobile);
+                return () => window.removeEventListener('resize', checkMobile);
+            }, []);
+
+            // Visual Scale: 10px = 1cm (High Res)
+            const SCALE = 10;
+
+            // Audio Synthesis: Ratchet Sound
+            const playRatchetSound = () => {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+                const ctx = audioCtxRef.current;
+                if (ctx.state === 'suspended') ctx.resume();
+
+                const t = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(1000 + Math.random() * 500, t);
+                osc.frequency.exponentialRampToValueAtTime(100, t + 0.05);
+
+                gain.gain.setValueAtTime(0.05, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.05);
+            };
+
+            // Drag Logic
+            const handlePointerDown = (e) => {
+                setIsDragging(true);
+                dragRef.current.startX = e.clientX || e.touches?.[0]?.clientX;
+                dragRef.current.startY = e.clientY || e.touches?.[0]?.clientY;
+                dragRef.current.startLength = length;
+                lastSoundLen.current = length;
+
+                e.currentTarget.setPointerCapture(e.pointerId);
+                document.body.style.userSelect = 'none';
+
+                // Stop any snapping animation
+                gsap.killTweensOf(proxies);
+            };
+
+            const proxies = useMemo(() => ({ length: 50 }), []); // Proxy for GSAP
+
+            const handlePointerMove = (e) => {
+                if (!isDragging) return;
+
+                const clientX = e.clientX || e.touches?.[0]?.clientX;
+                const clientY = e.clientY || e.touches?.[0]?.clientY;
+
+                let deltaCM = 0;
+
+                if (isMobile) {
+                    // Mobile: Pull Down (Positive DeltaY) -> Increase Length
+                    const deltaPixels = clientY - dragRef.current.startY;
+                    deltaCM = deltaPixels / SCALE;
+                } else {
+                    // Desktop: Pull Left (Negative DeltaX) -> Increase Length
+                    const deltaPixels = clientX - dragRef.current.startX;
+                    deltaCM = -(deltaPixels / SCALE);
+                }
+
+                let newLength = dragRef.current.startLength + deltaCM;
+                const maxLen = currentSnake.maxLength || 300;
+                newLength = Math.max(0, Math.min(maxLen, newLength));
+
+                setLength(Math.round(newLength));
+
+                // Sound Trigger (Every 2cm distinct change)
+                if (Math.abs(newLength - lastSoundLen.current) > 2) {
+                    playRatchetSound();
+                    lastSoundLen.current = newLength;
+                }
+            };
+
+            const handlePointerUp = (e) => {
+                setIsDragging(false);
+                e.currentTarget.releasePointerCapture(e.pointerId);
+                document.body.style.userSelect = '';
+
+                // Snap Back Effect REMOVED by user request
+                // User wants to see the image on the tape.
+                // We keep it extended.
+
+                // If we want a "soft snap" only when it's very short (to close it), we can add:
+                if (length < 5) {
+                    proxies.length = length;
+                    gsap.to(proxies, {
+                        length: 0,
+                        duration: 0.3,
+                        ease: "power2.out",
+                        onUpdate: () => setLength(Math.round(proxies.length))
+                    });
+                }
+                // Otherwise do nothing, let it stay.
+            };
+
+            // Switch (Reset length on switch)
+            const onSwitch = (idx) => {
+                if (onSwitchSnake) {
+                    onSwitchSnake(idx);
+                    setLength(0); // Reset ruler
+                }
+            };
+
+            // Safety Status Logic
+            const getSafetyStatus = (len) => {
+                if (len < 10) return { text: "準備測量", color: "text-gray-500", border: "border-gray-500" };
+                if (len < 50) return { text: "⚠️ 太近了！進入攻擊範圍 (0-50cm)", color: "text-red-500", border: "border-red-500" };
+                if (len < 100) return { text: "✋ 請保持警覺 (50-100cm)", color: "text-yellow-400", border: "border-yellow-400" };
+                return { text: "✅ 最佳安全觀察距離 (>100cm)", color: "text-green-400", border: "border-green-400" };
+            };
+
+            const status = getSafetyStatus(length);
+            const maxLen = currentSnake.maxLength || 300;
+
+            return (
+                <div className="w-full max-w-7xl mx-auto p-4 md:p-10 select-none flex flex-col items-center">
+
+                    {/* Header Group */}
+                    <div className="text-center mb-8 md:mb-12 space-y-2">
+                        <h3 className="text-3xl md:text-4xl font-black text-white tracking-tight">SNAKE RULER</h3>
+                        <p className="text-gray-400 font-mono text-sm tracking-widest">{isMobile ? 'PULL DOWN' : 'PULL LEFT'} TO REVEAL</p>
+                    </div>
+
+                    {/* Main Layout: Ruler + Dashboard */}
+                    <div className="w-full flex flex-col items-center justify-center gap-10">
+
+                        {/* Ruler Interaction Area */}
+                        {/* Wrapper changes logic based on Mobile */}
+                        <div className="relative flex-shrink-0 transition-all duration-300">
+                            <div
+                                className={`relative flex items-center justify-center overflow-visible
+                                    ${isMobile ? 'flex-col w-44 h-[80vh] min-h-[400px]' : 'w-full h-48 flex-row-reverse md:pr-20'}`}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerUp}
+                                style={isMobile ? { height: `${Math.max(400, length * SCALE + 200)}px` } : {}}
+                            >
+                                {/* 1. Ruler Case (Static Anchor) */}
+                                <div className="relative z-20 w-44 h-44 bg-[#0a0a0a] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.8)] border border-white/10 flex flex-col items-center justify-center pointer-events-none flex-shrink-0">
+                                    <div className="absolute top-3 left-3 w-2 h-2 rounded-full bg-[#333] shadow-inner"></div>
+                                    <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-[#333] shadow-inner"></div>
+                                    <div className="absolute bottom-3 left-3 w-2 h-2 rounded-full bg-[#333] shadow-inner"></div>
+                                    <div className="absolute bottom-3 right-3 w-2 h-2 rounded-full bg-[#333] shadow-inner"></div>
+                                    <div className="w-24 h-24 rounded-full border-4 border-[#1a1a1a] flex items-center justify-center bg-[#111]">
+                                        <span className="text-[#FF6B00] font-black text-2xl rotate-[-45deg] drop-shadow-lg">SNAKE<br />RULER</span>
+                                    </div>
+                                    <div className="mt-2 text-[#555] text-[10px] font-mono">PROFESSIONAL TOOL</div>
+                                </div>
+
+                                {/* 2. The Tape (Sliding Part) */}
+                                <div
+                                    className={`relative z-10 flex items-center transition-all duration-75 ease-out shadow-2xl cursor-grab active:cursor-grabbing bg-[#e0e0e0]
+                                        ${isMobile ? 'w-24 flex-col rounded-b-md border-x-2 border-b-2 mt-[-20px]' : 'h-24 flex-row rounded-l-md border-y-2 border-l-2 mr-[-20px]'}`}
+                                    style={isMobile ? {
+                                        height: `${length * SCALE + 40}px`, // +40 for handle area
+                                        minHeight: '40px',
+                                        touchAction: 'none' // Critical for mobile drag
+                                    } : {
+                                        width: `${length * SCALE + 40}px`,
+                                        minWidth: '40px',
+                                        touchAction: 'none' // Good practice for desktop touch too
+                                    }}
+                                    onPointerDown={handlePointerDown}
+                                >
+                                    {/* Tape Texture (Snake Skin) */}
+                                    <div
+                                        className={`absolute overflow-hidden flex items-center justify-center
+                                            ${isMobile ? 'inset-x-2 top-0 bottom-8 border-x border-gray-400' : 'inset-y-2 left-8 right-0 border-y border-gray-400'}`}
+                                        style={{
+                                            backgroundImage: `url('./蛇尺/${currentSnake.name}.png')`,
+                                            backgroundSize: isMobile ? '100% auto' : 'auto 100%',
+                                            backgroundRepeat: 'no-repeat',
+                                            backgroundPosition: isMobile ? 'center top' : 'left center',
+                                            filter: 'brightness(0.9) contrast(1.1)',
+                                            backgroundColor: '#d1d5db'
+                                        }}
+                                    >
+                                    </div>
+
+                                    {/* 3. The Hook / Handle */}
+                                    <div
+                                        className={`absolute bg-[#333] hover:bg-[#444] active:bg-[#555] transition-colors border-gray-500 shadow-lg flex items-center justify-center z-30 group
+                                            ${isMobile ? 'bottom-0 left-0 right-0 h-8 rounded-b-md border-t-2' : 'left-0 top-0 bottom-0 w-8 rounded-l-md border-r-2'}`}
+                                    >
+                                        <div className={`bg-gray-600 rounded-full group-hover:bg-orange-500 transition-colors ${isMobile ? 'w-12 h-1' : 'w-1 h-12'}`}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Info Dashboard */}
+                        <div className="w-full mt-4 grid grid-cols-1 md:grid-cols-12 gap-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                            {/* ... same info cards ... */}
+                            <div className="md:col-span-5 bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-sm flex flex-col justify-center">
+                                <h4 className="text-orange-500 font-bold tracking-wider text-sm mb-3 flex items-center justify-center md:justify-start gap-2">
+                                    <PuzzleSimple size={16} /> 實體教具展示
+                                </h4>
+                                <p className="text-gray-400 text-sm leading-relaxed">
+                                    專為生態與數學教育設計的互動教具。{isMobile ? '向下拉動' : '向左拉動'}尺帶，建立對生物安全距離的直觀感受。
+                                </p>
+                            </div>
+
+                            <div className="md:col-span-4 flex flex-col gap-4">
+                                <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                        <span className="text-gray-500 text-xs font-mono uppercase">Target Species</span>
+                                        <span className="text-white font-bold">{currentSnake.name}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-500 text-xs font-mono uppercase">Authentic Length</span>
+                                        <span className="text-orange-400 font-mono text-xl">{maxLen} <span className="text-sm text-gray-500">cm</span></span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between px-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onSwitch((snakes.findIndex(s => s.name === currentSnake.name) - 1 + snakes.length) % snakes.length); }}
+                                        className="p-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/20 transition-all"
+                                    >
+                                        <ChevronLeft size={20} className="text-gray-400" />
+                                    </button>
+                                    <span className="text-xs text-gray-500 font-mono">SWITCH PATTERN</span>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onSwitch((snakes.findIndex(s => s.name === currentSnake.name) + 1) % snakes.length); }}
+                                        className="p-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/20 transition-all"
+                                    >
+                                        <ChevronRight size={20} className="text-gray-400" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="md:col-span-3 bg-black/40 rounded-xl p-6 flex flex-col items-center justify-center border border-white/5 h-full min-h-[140px]">
+                                <span className="text-gray-500 text-[10px] font-mono mb-1">CURRENT DISTANCE</span>
+                                <div className="font-mono text-5xl font-bold text-white tabular-nums text-shadow-glow">
+                                    {length}<span className="text-xl text-gray-500 ml-2">cm</span>
+                                </div>
+                                <div className={`mt-3 px-3 py-1 rounded-full border ${status.border} text-[10px] font-bold ${status.color}`}>
+                                    {status.text}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // --- Component: Lanyard Trigger (Improved Physics) ---
+        // --- Component: Menu Button (Hamburger) ---
+        const MenuButton = ({ isOpen, onClick }) => {
+            return (
+                <button
+                    onClick={onClick}
+                    className="fixed top-8 left-8 z-[2000] p-3 group mix-blend-difference text-white focus:outline-none"
+                    aria-label="Toggle Menu"
+                >
+                    <div className="relative flex flex-col justify-center items-center w-8 h-8 space-y-2">
+                        <span className={`block w-8 h-0.5 bg-current transition-all duration-300 ease-out ${isOpen ? 'rotate-45 translate-y-2.5' : ''}`}></span>
+                        <span className={`block w-8 h-0.5 bg-current transition-all duration-300 ease-out ${isOpen ? 'opacity-0' : ''}`}></span>
+                        <span className={`block w-8 h-0.5 bg-current transition-all duration-300 ease-out ${isOpen ? '-rotate-45 -translate-y-2.5' : ''}`}></span>
+                    </div>
+                </button>
+            );
+        };
+
+        // --- Component: Gradient Menu Overlay ---
+        const GradientMenuOverlay = ({ isOpen, menuItems, onNavigate }) => {
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                const tl = gsap.timeline({ paused: true });
+
+                // Background Expansion
+                tl.fromTo(containerRef.current,
+                    { clipPath: "circle(0% at 50px 50px)" },
+                    { clipPath: "circle(150% at 50px 50px)", duration: 0.8, ease: "power3.inOut" }
+                );
+
+                // List Items Slide Up (Simple Stagger)
+                tl.fromTo(".menu-link-item",
+                    { y: 50, opacity: 0 },
+                    { y: 0, opacity: 1, duration: 0.5, stagger: 0.1, ease: "power3.out" },
+                    "-=0.4"
+                );
+
+                if (isOpen) {
+                    tl.play();
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    tl.reverse();
+                    document.body.style.overflow = '';
+                }
+
+                return () => {
+                    tl.kill();
+                    document.body.style.overflow = '';
+                };
+            }, [isOpen]);
+
+            return (
+                <div
+                    ref={containerRef}
+                    className="fixed inset-0 z-[1500] flex flex-col items-center justify-center bg-gradient-to-br from-[#1a1a1a] via-[#0f1115] to-[#000]"
+                    style={{ clipPath: "circle(0% at 50px 50px)" }}
+                >
+                    {/* Background Noise/Texture */}
+                    <div className="absolute inset-0 opacity-10 pointer-events-none"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
+                    </div>
+
+                    <div className="flex flex-col gap-6 text-center z-10 w-full px-6">
+                        {menuItems.map((item, i) => (
+                            <div
+                                key={i}
+                                onClick={() => onNavigate(item.id)}
+                                className="menu-link-item cursor-pointer group relative overflow-hidden py-2"
+                            >
+                                <span className="block text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-500 to-gray-300 group-hover:from-green-400 group-hover:to-emerald-600 transition-all duration-500">
+                                    {item.label}
+                                </span>
+                                <span className="block text-xs md:text-sm font-mono text-gray-600 mt-1 tracking-[0.5em] uppercase group-hover:text-green-500/50 transition-colors">
+                                    Section {String(i + 1).padStart(2, '0')}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Decorative Elements */}
+                    <div className="absolute bottom-10 left-0 w-full text-center text-gray-700 font-mono text-xs tracking-widest opacity-50">
+                        THE SERPENT'S VOICE / NAVIGATION
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Component: 3D Flip Book (Landscape B4 - Double Sided) ---
+        const FlipBook3D = ({ images }) => {
+            const [currentPage, setCurrentPage] = useState(0);
+            // Group images into Sheets (Front + Back)
+            const totalSheets = Math.ceil(images.length / 2);
+
+            const handleNext = () => {
+                if (currentPage < totalSheets) setCurrentPage(prev => prev + 1);
+            };
+
+            const handlePrev = () => {
+                if (currentPage > 0) setCurrentPage(prev => prev - 1);
+            };
+
+            return (
+                <div className="relative w-full max-w-6xl mx-auto h-[400px] md:h-[600px] flex items-center justify-center perspective-2000">
+                    <div className="relative w-[420px] md:w-[600px] h-[300px] md:h-[425px] md:translate-x-1/2" style={{ transformStyle: 'preserve-3d' }}>
+
+                        {/* Pages Stack */}
+                        {Array.from({ length: totalSheets }).map((_, sheetIndex) => {
+                            const zIndex = totalSheets - sheetIndex;
+                            const isFlipped = currentPage > sheetIndex;
+
+                            const frontImg = images[sheetIndex * 2];
+                            const backImg = images[sheetIndex * 2 + 1];
+
+                            return (
+                                <div
+                                    key={sheetIndex}
+                                    className="absolute inset-0 transition-transform duration-1000 ease-in-out cursor-pointer origin-left shadow-xl"
+                                    style={{
+                                        zIndex: isFlipped ? sheetIndex : zIndex,
+                                        transformStyle: 'preserve-3d',
+                                        transform: isFlipped ? 'rotateY(-180deg)' : 'rotateY(0deg)',
+                                    }}
+                                    onClick={() => {
+                                        if (isFlipped) handlePrev();
+                                        else handleNext();
+                                    }}
+                                >
+                                    {/* Front of the Sheet (Right Side) */}
+                                    <div
+                                        className="absolute inset-0 w-full h-full bg-[#1a1a1a] backface-hidden rounded-r-sm overflow-hidden border-l border-white/10"
+                                        style={{
+                                            backfaceVisibility: 'hidden',
+                                            backgroundImage: `url('${frontImg}')`,
+                                            backgroundSize: '100% 100%',
+                                            backgroundPosition: 'center',
+                                            boxShadow: 'inset 10px 0 30px rgba(0,0,0,0.5)'
+                                        }}
+                                    >
+                                        <div className="absolute bottom-2 right-4 text-white/50 text-[10px] font-mono">{sheetIndex * 2 + 1}</div>
+                                    </div>
+
+                                    {/* Back of the Sheet (Left Side) - Now has Image! */}
+                                    <div
+                                        className="absolute inset-0 w-full h-full bg-[#1a1a1a] backface-hidden rounded-l-sm overflow-hidden border-r border-white/10"
+                                        style={{
+                                            backfaceVisibility: 'hidden',
+                                            transform: 'rotateY(180deg)',
+                                            backgroundImage: backImg ? `url('${backImg}')` : 'none',
+                                            backgroundSize: '100% 100%',
+                                            backgroundPosition: 'center',
+                                            boxShadow: 'inset -10px 0 30px rgba(0,0,0,0.5)'
+                                        }}
+                                    >
+                                        {!backImg && (
+                                            <div className="flex items-center justify-center h-full text-white/10 font-mono text-lg rotate-y-180">
+                                                <div className="scale-x-[-1]">THE END</div>
+                                            </div>
+                                        )}
+                                        {backImg && <div className="absolute bottom-2 left-4 text-white/50 text-[10px] font-mono transform scale-x-[-1]">{sheetIndex * 2 + 2}</div>}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Navigation Hints */}
+                    <div className="absolute -bottom-12 flex gap-8 z-20">
+                        <button onClick={handlePrev} className={`p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/20 transition-all ${currentPage === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                            <ChevronLeft size={24} className="text-white" />
+                        </button>
+                        <div className="flex flex-col items-center justify-center">
+                            <span className="text-white/40 text-xs font-mono tracking-widest">FLIP</span>
+                            <span className="text-orange-500 font-bold">{currentPage} / {totalSheets}</span>
+                        </div>
+                        <button onClick={handleNext} className={`p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/20 transition-all ${currentPage === totalSheets ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                            <ChevronRight size={24} className="text-white" />
+                        </button>
+                    </div>
+
+                    <style>{`
+                        .perspective-2000 { perspective: 2500px; }
+                        .backface-hidden { backface-visibility: hidden; }
+                    `}</style>
+                </div>
+            );
+        };
+
+        // --- Component: Falling Text Background ---
+        // --- Component: Physics Falling Text (Matter.js Style) ---
+        // --- Component: ScrollReveal ---
+        const ScrollReveal = ({ children, className = "", delay = 0, y = 50, duration = 1 }) => {
+            const ref = useRef(null);
+            useEffect(() => {
+                const element = ref.current;
+                if (element) {
+                    gsap.fromTo(element,
+                        { y: y, opacity: 0, autoAlpha: 0 },
+                        {
+                            y: 0, opacity: 1, autoAlpha: 1, duration: duration, ease: "power3.out", delay: delay,
+                            scrollTrigger: {
+                                trigger: element,
+                                start: "top 85%",
+                                toggleActions: "play none none reverse"
+                            }
+                        }
+                    );
+                }
+            }, [delay, y, duration]);
+            return <div ref={ref} className={`reveal-item ${className}`} style={{ opacity: 0, visibility: 'hidden' }}>{children}</div>;
+        };
+
+        // --- Component: TypewriterText (Typewriter Effect) ---
+        const TypewriterText = ({ text, className = "", speed = 50, delay = 0, cursor = true }) => {
+            const [displayText, setDisplayText] = useState("");
+            const [showCursor, setShowCursor] = useState(false);
+            const [hasTriggered, setHasTriggered] = useState(false);
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                const element = containerRef.current;
+                if (!element) return;
+
+                const st = ScrollTrigger.create({
+                    trigger: element,
+                    start: "top 85%", // Trigger slightly earlier
+                    onEnter: () => {
+                        if (!hasTriggered) {
+                            // Apply delay before starting
+                            setTimeout(() => {
+                                setHasTriggered(true);
+                                setShowCursor(true); // Show cursor when typing starts
+                            }, delay * 1000);
+                        }
+                    }
+                });
+
+                return () => st.kill();
+            }, [hasTriggered, delay]);
+
+            useEffect(() => {
+                if (!hasTriggered) return;
+
+                let i = 0;
+                const typing = setInterval(() => {
+                    if (i < text.length) {
+                        setDisplayText(text.substring(0, i + 1));
+                        i++;
+                    } else {
+                        clearInterval(typing);
+                        setShowCursor(false); // Hide cursor immediately after typing is done
+                    }
+                }, speed);
+
+                return () => clearInterval(typing);
+            }, [hasTriggered, text, speed]);
+
+            return (
+                <span ref={containerRef} className={`${className} inline-block decoration-clone font-mono`}>
+                    {displayText}
+                    {cursor && showCursor && (
+                        <span className="inline-block ml-1 w-2 h-4 bg-orange-500 align-middle animate-blink"></span>
+                    )}
+                </span>
+            );
+        };
+
+        // Add Blink Animation globally if not present styling
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `
+            @keyframes blink {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0; }
+            }
+            .animate-blink {
+                animation: blink 0.8s step-end infinite;
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+        // --- Component: FallingText (Matter.js) ---
+        const FallingText = ({
+            text = '',
+            highlightWords = [],
+            highlightClass = 'highlighted',
+            trigger = 'auto',
+            backgroundColor = 'transparent',
+            wireframes = false,
+            gravity = 1,
+            mouseConstraintStiffness = 0.2,
+            fontSize = '1rem'
+        }) => {
+            const containerRef = useRef(null);
+            const textRef = useRef(null);
+            const canvasContainerRef = useRef(null);
+            const [effectStarted, setEffectStarted] = useState(false);
+
+            // 1. Prepare Words (Memoized)
+            const words = useMemo(() => {
+                return text.split(' ').map((word, index) => {
+                    const isHighlighted = highlightWords.some(hw => word.includes(hw));
+                    return {
+                        id: index,
+                        text: word,
+                        className: `word ${isHighlighted ? highlightClass : ''}`,
+                        isTarget: (word === "DOWNLOAD" || word === "APP")
+                    };
+                });
+            }, [text, highlightWords, highlightClass]);
+
+            // 2. Trigger Logic
+            useEffect(() => {
+                if (trigger === 'auto') {
+                    setEffectStarted(true);
+                } else if (trigger === 'scroll' && containerRef.current) {
+                    // Wait for GSAP ScrollTrigger to load
+                    const st = window.ScrollTrigger;
+                    if (st) {
+                        st.create({
+                            trigger: containerRef.current,
+                            start: "top 70%",
+                            onEnter: () => setEffectStarted(true)
+                        });
+                    } else {
+                        // Fallback
+                        setEffectStarted(true);
+                    }
+                }
+            }, [trigger]);
+
+            // 3. Matter.js Simulation
+            useEffect(() => {
+                if (!effectStarted) return;
+
+                // Disable falling text on mobile for performance
+                if (window.innerWidth < 768) return;
+
+                const setStatus = (msg) => { /* console.log(msg); */ };
+
+                let engine, render, runner;
+
+                const initPhysics = () => {
+                    try {
+                        setStatus("Physics: Init Engine...");
+                        const Matter = window.Matter;
+                        const { Engine, Render, World, Bodies, Runner, Mouse, MouseConstraint, Composite } = Matter;
+
+                        const containerRect = containerRef.current.getBoundingClientRect();
+                        const width = containerRect.width;
+                        const height = containerRect.height;
+
+                        if (width <= 0 || height <= 0) return;
+
+                        engine = Engine.create();
+                        engine.world.gravity.y = gravity;
+
+                        render = Render.create({
+                            element: canvasContainerRef.current,
+                            engine,
+                            options: {
+                                width,
+                                height,
+                                background: backgroundColor,
+                                wireframes,
+                                pixelRatio: window.devicePixelRatio
+                            }
+                        });
+
+                        const boundaryOptions = { isStatic: true, render: { fillStyle: 'transparent' } };
+                        const floor = Bodies.rectangle(width / 2, height + 25, width, 50, boundaryOptions);
+                        const leftWall = Bodies.rectangle(-25, height / 2, 50, height * 2, boundaryOptions);
+                        const rightWall = Bodies.rectangle(width + 25, height / 2, 50, height * 2, boundaryOptions);
+
+                        setStatus("Physics: Finding words...");
+                        const wordSpans = textRef.current.querySelectorAll('.word');
+
+                        if (wordSpans.length === 0) {
+                            setStatus("Error: No .word found!");
+                            return;
+                        }
+                        setStatus(`Physics: Found ${wordSpans.length} words`);
+
+                        const wordBodies = [...wordSpans].map(elem => {
+                            const rect = elem.getBoundingClientRect();
+                            const wordText = elem.dataset.word;
+
+                            let x, y;
+                            if (wordText === "DOWNLOAD" || wordText === "APP") {
+                                x = width / 2 + (Math.random() - 0.5) * 100;
+                                y = height * 0.2 + (Math.random() * 100);
+                            } else {
+                                x = (Math.random() * width * 0.8) + (width * 0.1);
+                                y = (Math.random() * height * 0.5) - height * 0.5;
+                            }
+
+                            const body = Bodies.rectangle(x, y, rect.width, rect.height, {
+                                render: { fillStyle: 'transparent' },
+                                restitution: 0.6,
+                                frictionAir: 0.05,
+                                friction: 0.2,
+                                angle: (Math.random() - 0.5) * 0.2
+                            });
+
+                            Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 2, y: Math.random() * 2 });
+
+                            return { elem, body };
+                        });
+
+                        setStatus("Physics: Hiding static...");
+                        wordBodies.forEach(({ elem, body }) => {
+                            elem.style.position = 'absolute';
+                            elem.style.left = '0';
+                            elem.style.top = '0';
+                            elem.style.willChange = 'transform';
+                            elem.style.opacity = 1;
+                        });
+
+                        const mouse = Mouse.create(containerRef.current);
+                        const mouseConstraint = MouseConstraint.create(engine, {
+                            mouse,
+                            constraint: { stiffness: mouseConstraintStiffness, render: { visible: false } }
+                        });
+                        render.mouse = mouse;
+
+                        Composite.add(engine.world, [floor, leftWall, rightWall, mouseConstraint, ...wordBodies.map(wb => wb.body)]);
+
+                        setStatus("Physics: Starting Runner");
+                        runner = Runner.create();
+                        Runner.run(runner, engine);
+                        Render.run(render);
+
+                        const updateLoop = () => {
+                            wordBodies.forEach(({ body, elem }) => {
+                                const { x, y } = body.position;
+                                const angle = body.angle;
+                                elem.style.transform = `translate(${x - elem.offsetWidth / 2}px, ${y - elem.offsetHeight / 2}px) rotate(${angle}rad)`;
+                            });
+                            requestAnimationFrame(updateLoop);
+                        };
+                        updateLoop();
+                        setStatus("Falling Text Active!");
+
+                    } catch (err) {
+                        setStatus("Crash: " + err.message);
+                        console.error(err);
+                    }
+                };
+
+                let retryCount = 0;
+                const maxRetries = 100; // 10 seconds approx
+
+                const attemptInit = () => {
+                    // 1. Check Matter.js
+                    if (!window.Matter) {
+                        retryCount++;
+                        setStatus(`Waiting for Matter... (${retryCount}/${maxRetries})`);
+                        if (retryCount > maxRetries) {
+                            setStatus("Error: Matter.js timeout");
+                            console.error("Physics Engine failed to load (Timeout).");
+                            return;
+                        }
+                        return setTimeout(attemptInit, 100);
+                    }
+
+                    // 2. Check Dimensions (CRITICAL: Often 0 on first render)
+                    const rect = containerRef.current.getBoundingClientRect();
+                    setStatus(`Checking dim: ${Math.round(rect.width)}x${Math.round(rect.height)}`);
+
+                    if (rect.width <= 0 || rect.height <= 0) {
+                        return setTimeout(attemptInit, 200);
+                    }
+
+                    // 3. Success -> Start
+                    setStatus("Ready! Init...");
+                    initPhysics();
+                };
+
+                attemptInit();
+
+                return () => {
+                    if (render) {
+                        Render.stop(render);
+                        if (render.canvas && canvasContainerRef.current) {
+                            canvasContainerRef.current.removeChild(render.canvas);
+                        }
+                    }
+                    if (runner) Runner.stop(runner);
+                    if (engine) {
+                        World.clear(engine.world);
+                        Engine.clear(engine);
+                    }
+                };
+            }, [effectStarted, gravity, wireframes, backgroundColor, mouseConstraintStiffness]);
+
+            const handleTrigger = () => {
+                if (!effectStarted && (trigger === 'click' || trigger === 'hover')) {
+                    setEffectStarted(true);
+                }
+            };
+
+            return (
+                <div
+                    ref={containerRef}
+                    className="falling-text-container"
+                    onClick={trigger === 'click' ? handleTrigger : undefined}
+                    onMouseEnter={trigger === 'hover' ? handleTrigger : undefined}
+                >
+                    <div
+                        ref={textRef}
+                        className="falling-text-target"
+                        style={{
+                            fontSize: fontSize,
+                            lineHeight: 1.4,
+                            color: '#444' // fallback color
+                        }}
+                    >
+                        {words.map((w) => (
+                            <span
+                                key={w.id}
+                                className={w.className}
+                                data-word={w.text}
+                            >
+                                {w.text}
+                            </span>
+                        ))}
+                    </div>
+                    <div ref={canvasContainerRef} className="falling-text-canvas" />
+                </div>
+            );
+        };
+
+
+        // --- Component: Storytelling Section (First-Person) ---
+        const StorySection = () => {
+            return (
+                <section id="section-story" className="relative py-32 bg-[#0F1115] overflow-hidden flex justify-center items-center font-mono">
+                    <div className="container mx-auto px-6 relative z-10 max-w-4xl">
+                        <ScrollReveal>
+                            {/* System Messages */}
+                            <div className="mb-12 space-y-2 text-sm md:text-base">
+                                <div className="text-green-500">
+                                    <TypewriterText text="> SYSTEM: 接收到微弱訊號..." speed={30} delay={0} />
+                                </div>
+                                <div className="text-orange-500">
+                                    <TypewriterText text="> DECODING: 正在轉譯生物語言..." speed={30} delay={1.5} />
+                                </div>
+                            </div>
+
+                            {/* Main Decoded Text */}
+                            <div className="space-y-8 text-gray-300 leading-relaxed text-lg md:text-2xl border-l-2 border-green-900/50 pl-6 ml-1">
+                                <div className="space-y-4">
+                                    <p>
+                                        <TypewriterText text="「人類，別急著尖叫。" speed={50} delay={3.5} />
+                                    </p>
+                                    <p>
+                                        <TypewriterText text="我沒有手腳，只能貼著地面感受你們的震動。" speed={50} delay={5.5} />
+                                    </p>
+                                    <p>
+                                        <TypewriterText text="你們眼中的『恐懼』，" speed={50} delay={8.5} />
+                                        <br />
+                                        <span className="text-white font-bold">
+                                            <TypewriterText text="其實是我演化了萬年的『生存幾何』。" speed={50} delay={10.5} />
+                                        </span>
+                                    </p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <p>
+                                        <TypewriterText text="我身上的花紋，不是為了嚇唬誰，" speed={50} delay={13.5} />
+                                    </p>
+                                    <p>
+                                        <TypewriterText text="而是落葉堆裡的隱身術，是森林的守護色。" speed={50} delay={16.0} />
+                                    </p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <p>
+                                        <TypewriterText text="我不貪心，只取所需；" speed={50} delay={19.0} />
+                                    </p>
+                                    <p>
+                                        <TypewriterText text="我不攻擊，除非無路可退。" speed={50} delay={21.0} />
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2 pt-4">
+                                    <p>
+                                        <TypewriterText text="請保持距離，試著解讀我。" speed={50} delay={23.5} />
+                                    </p>
+                                    <p>
+                                        <TypewriterText text="聽見了嗎？" speed={80} delay={26.0} />
+                                    </p>
+                                    <p className="text-green-400 font-bold text-2xl md:text-3xl">
+                                        <TypewriterText text="這是屬於我的，聲音。」" speed={100} delay={28.0} />
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Connection Status */}
+                            <div className="mt-16 text-xs md:text-sm text-green-500 opacity-60">
+                                <TypewriterText text="> CONNECTION ESTABLISHED. (連結已建立)" speed={20} delay={32.0} />
+                            </div>
+
+                        </ScrollReveal>
+                    </div>
+                    {/* Ambient Background Element */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-green-900/10 rounded-full blur-[100px] pointer-events-none"></div>
+                </section>
+            );
+        };
+
+
+        // --- Component: App Download Section (Ecological Translator) ---
+        const AppDownloadSection = () => {
+            return (
+                <section id="section-app" className="relative ml-0 min-h-[60vh] flex flex-col items-center justify-center py-20 bg-black overflow-hidden border-t border-white/10 font-mono">
+
+                    {/* Background Layer: Matrix Data Flow */}
+                    <div className="absolute inset-0 z-0 opacity-30">
+                        <FallingText
+                            text="SYSTEM READY LOADING DATA TRANSLATING SIGNAL HERPETOLOGY PYTHON VIPER COBRA NATRIX ECOLOGY ANALYSIS DECODING... 01010101 森林訊號 解析中..."
+                            highlightWords={["SYSTEM", "READY", "DECODING", "TRANSLATING"]}
+                            trigger="scroll"
+                            backgroundColor="transparent"
+                            wireframes={false}
+                            gravity={0.5}
+                            fontSize="1rem"
+                            mouseConstraintStiffness={0.2}
+                        />
+                    </div>
+
+                    <ScrollReveal className="relative z-10 container mx-auto px-6 text-center">
+
+                        <div className="inline-block px-4 py-1 border border-green-500/50 rounded-full text-green-500 text-xs tracking-widest mb-6 animate-pulse">
+                            &gt; SYSTEM READY // 裝備就緒
+                        </div>
+
+                        <h2 className="text-4xl md:text-5xl font-black text-white mb-6 tracking-wide">
+                            【 裝載森林的翻譯機 】
+                        </h2>
+
+                        <div className="text-gray-400 space-y-2 mb-10 text-sm md:text-base">
+                            <p>我們將蛇的生物訊號，轉譯為你能讀懂的語言。</p>
+                            <p>解鎖 7 種蛇類的頻率，開始你的第一次對話。</p>
+                        </div>
+
+                        {/* Feature List (Micro-copy) */}
+                        <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-500 mb-10 font-sans">
+                            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>AR 棲地掃描</span>
+                            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>蛇類安全圖鑑</span>
+                            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>探險家任務系統</span>
+                            <span className="text-gray-600 border-l border-white/10 pl-4 ml-2">iOS 15+ / Android 10+</span>
+                        </div>
+
+                        {/* Download Buttons */}
+                        <div className="flex flex-col md:flex-row gap-6 justify-center items-center pointer-events-auto">
+                            <button className="group relative px-8 py-4 bg-white text-black rounded-full font-bold text-lg flex items-center gap-3 hover:scale-105 transition-all duration-300 overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                                <span className="relative z-10 flex items-center gap-2">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.74 1.18 0 2.21-.93 3.8-.74 2.07.25 3.32.96 4.36 2.47-3.8 1.83-3.08 6.64.67 8.21-.76 2.01-1.93 3.49-3.91 2.29zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" /></svg>
+                                    下載 iOS 版本
+                                </span>
+                            </button>
+
+                            <button className="group relative px-8 py-4 bg-transparent border border-green-500/50 text-green-400 rounded-full font-bold text-lg flex items-center gap-3 hover:bg-green-500/10 hover:border-green-400 transition-all duration-300 overflow-hidden">
+                                <span className="relative z-10 flex items-center gap-2">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M3,20.5V3.5C3,2.91,3.34,2.39,3.84,2.15L13.69,12L3.84,21.85C3.34,21.6,3,21.09,3,20.5M16.81,15.12L6.05,21.34L14.54,12.85M16.81,8.88L14.54,11.15L6.05,2.66M18.89,12L17.84,13.05L17.84,10.95" /></svg>
+                                    下載 Android 版本
+                                </span>
+                            </button>
+                        </div>
+                    </ScrollReveal>
+                </section>
+            );
+        };
+
+        // --- Component: VisionSection (Call to Action - Updated) ---
+        const VisionSection = () => {
+            return (
+                <section id="section-vision" className="relative py-40 bg-[#0a0a0a] flex flex-col items-center text-center overflow-hidden">
+                    {/* Darkened Habitat Background */}
+                    <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1534067783849-c960f588c7d6?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80')] bg-cover bg-center filter grayscale blur-sm"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black"></div>
+
+                    <div className="container mx-auto px-6 max-w-4xl z-10">
+                        <ScrollReveal>
+                            <div className="mb-16">
+                                <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-widest border-b-2 border-orange-500/30 inline-block pb-4">
+                                    【 願景：當未知變成已知 】
+                                </h2>
+                            </div>
+
+                            <div className="text-gray-300 text-lg md:text-2xl leading-[1.8] font-serif tracking-wide space-y-6">
+                                <p><TypewriterText text="恐懼，往往源於「不了解」。" speed={40} delay={0.5} /></p>
+                                <p><TypewriterText text="《它說》不只是一個數位採集計畫，" speed={40} delay={2.5} /></p>
+                                <p><TypewriterText text="更是一場關於生命的再設計。" speed={40} delay={4.5} /></p>
+                                <p><TypewriterText text="當我們透過科技，拉近了與自然的焦距，" speed={40} delay={6.5} /></p>
+                                <p><TypewriterText text="下一次在山林偶遇時，" speed={40} delay={8.5} /></p>
+                                <p><TypewriterText text="希望你能用「觀察」取代「驚慌」，" speed={40} delay={10.5} /></p>
+                                <p><span className="text-orange-400"><TypewriterText text="用「欣賞」取代「攻擊」。" speed={40} delay={12.5} /></span></p>
+                                <div className="pt-8 space-y-2">
+                                    <p className="text-2xl md:text-3xl font-bold text-white"><TypewriterText text="聽見它說，學會尊重。" speed={80} delay={15.0} /></p>
+                                    <p className="text-xl md:text-2xl text-gray-400"><TypewriterText text="這就是我們最想傳達的溫柔。" speed={60} delay={17.5} /></p>
+                                </div>
+                            </div>
+                        </ScrollReveal>
+                    </div>
+                </section>
+            );
+        };
+
+        // --- Component: Footer Section (New Minimal) ---
+        const FooterSection = () => {
+            return (
+                <footer className="relative bg-[#1a1a1a] text-[#888888] py-16 text-sm font-light border-t border-white/5">
+                    <div className="container mx-auto px-6 max-w-6xl">
+                        {/* Separator Line */}
+                        <div className="w-full h-px bg-white/10 mb-12"></div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
+                            {/* Column 1: Project Info */}
+                            <div className="space-y-4">
+                                <h5 className="text-white font-bold tracking-widest uppercase mb-4 text-xs">Project</h5>
+                                <p className="font-bold text-lg text-white/90">它說 The Serpent's Voice</p>
+                                <p>視覺傳達設計系日間部 第 29 屆畢業製作</p>
+                                <p>指導老師：劉棠思 / 邱勇標</p>
+                            </div>
+
+                            {/* Column 2: Team */}
+                            <div className="space-y-4">
+                                <h5 className="text-white font-bold tracking-widest uppercase mb-4 text-xs">Team</h5>
+                                <div className="leading-relaxed">
+                                    <p className="font-bold text-white/90 mb-2">設計團隊：</p>
+                                    <p>杜姮諾 | 林佳樺 | 李彥萱 | 蕭福佑</p>
+                                    <p>賴丞希 | 吳怡賢 | 古凱文</p>
+                                </div>
+                            </div>
+
+                            {/* Column 3: Contact */}
+                            <div className="space-y-4">
+                                <h5 className="text-white font-bold tracking-widest uppercase mb-4 text-xs">Connect</h5>
+                                <div className="space-y-2">
+                                    <p className="hover:text-white transition-colors cursor-pointer">📧 contact@serpent-voice.tw</p>
+                                    <p className="hover:text-white transition-colors cursor-pointer">📷 @it_says_design</p>
+                                    <p className="hover:text-white transition-colors cursor-pointer">📘 它說 The Serpent's Voice</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Bottom Copyright */}
+                        <div className="mt-16 pt-8 border-t border-white/5 text-xs text-center md:text-left flex flex-col md:flex-row justify-between items-center opacity-60">
+                            <p>Copyright © 2024 The Serpent's Voice. All Rights Reserved.</p>
+                            <p className="mt-2 md:mt-0">本網站為學術畢業製作成果，圖片與內容版權歸原作者所有。</p>
+                        </div>
+                    </div>
+                </footer>
+            );
+        };
+
+
+
+
+
+        const BookSection = () => {
+            const bookImages = [
+                './書/蛇型位子.jpg', // Designated Front Cover
+                './書/1768200299168.png',
+                './書/1768200299281.png',
+                './書/1768200299370.png',
+                './書/1768200299468.png',
+                './書/1768200301737.png',
+                './書/1768200301798.png',
+                './書/1768200301848.png',
+                './書/1768200301926.png',
+                './書/1768200305002.png',
+                './書/1768200305079.png',
+                './書/1768200305130.png',
+                './書/1768200305196.png',
+                './書/1768200307030.png',
+                './書/1768200307118.png',
+                './書/1768200307174.png',
+                './書/1768200307243.png',
+                './書/1768200307292.png',
+                './書/1768200307360.png',
+                './書/1768200307415.png',
+                './書/1768200307480.png',
+                './書/1768200307558.png',
+                './書/1768200307635.png',
+                './書/封面封底.png' // Designated Back Cover
+            ];
+
+            return (
+                <section id="section-book" className="product-section min-h-screen py-20 bg-[#0e0e0e] relative overflow-hidden flex flex-col items-center justify-center border-t border-white/5">
+                    {/* Background Ambient */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-orange-900/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+                    <div className="container mx-auto px-6 z-10 transform scale-90 md:scale-100">
+                        {/* Section Header */}
+                        <ScrollReveal>
+                            <div className="text-center mb-12 space-y-4">
+                                <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter">THE BOOK</h2>
+                                <p className="text-gray-400 font-mono tracking-widest text-sm">HORIZONTAL B4 EDITION</p>
+                            </div>
+
+                            {/* 3D Book Component */}
+                            <FlipBook3D images={bookImages} />
+                        </ScrollReveal>
+
+                    </div>
+                </section>
+            );
+        };
+
+        // --- 主程式 ---
+        const App = () => {
+            const [showIntro, setShowIntro] = useState(true);
+            const [currentSnake, setCurrentSnake] = useState(0);
+            const [isMenuOpen, setIsMenuOpen] = useState(false); // Add menu state
+
+            // 切換蛇卡片的函數
+            const nextSnake = () => setCurrentSnake((prev) => (prev + 1) % snakes.length);
+            const prevSnake = () => setCurrentSnake((prev) => (prev - 1 + snakes.length) % snakes.length);
+
+            // Ambience: Pink Noise
+            useEffect(() => {
+                const initAudio = () => {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContext) return;
+                    const ctx = new AudioContext();
+                    const bufferSize = 4096;
+                    const pinkNoise = (function () {
+                        let b0, b1, b2, b3, b4, b5, b6;
+                        b0 = b1 = b2 = b3 = b4 = b5 = b6 = 0.0;
+                        const node = ctx.createScriptProcessor(bufferSize, 1, 1);
+                        node.onaudioprocess = function (e) {
+                            const output = e.outputBuffer.getChannelData(0);
+                            for (let i = 0; i < bufferSize; i++) {
+                                const white = Math.random() * 2 - 1;
+                                b0 = 0.99886 * b0 + white * 0.0555179;
+                                b1 = 0.99332 * b1 + white * 0.0750759;
+                                b2 = 0.96900 * b2 + white * 0.1538520;
+                                b3 = 0.86650 * b3 + white * 0.3104856;
+                                b4 = 0.55000 * b4 + white * 0.5329522;
+                                b5 = -0.7616 * b5 - white * 0.0168980;
+                                output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+                                output[i] *= 0.03; // Low volume
+                                b6 = white * 0.115926;
+                            }
+                        };
+                        return node;
+                    })();
+
+                    const gain = ctx.createGain();
+                    gain.gain.value = 0.05;
+                    pinkNoise.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    window.removeEventListener('click', initAudio);
+                    window.removeEventListener('touchstart', initAudio);
+                };
+                window.addEventListener('click', initAudio);
+                window.addEventListener('touchstart', initAudio);
+                return () => {
+                    window.removeEventListener('click', initAudio);
+                    window.removeEventListener('touchstart', initAudio);
+                };
+            }, []);
+
+            useEffect(() => {
+                gsap.registerPlugin(ScrollTrigger);
+
+                // Lock scroll initially
+                document.body.style.overflow = 'hidden';
+                window.scrollTo(0, 0);
+
+                // Intro Animation (Simple Fade)
+                const tl = gsap.timeline({
+                    onComplete: () => {
+                        setShowIntro(false);
+                        document.body.style.overflow = ''; // Restore scroll
+                    }
+                });
+
+                tl.to(".intro-text", { opacity: 1, duration: 1.5, ease: "power2.inOut" })
+                    .to(".intro-overlay", { opacity: 0, duration: 1, ease: "power2.inOut", delay: 1 })
+                    .set(".intro-overlay", { display: "none" });
+
+            }, []);
+
+            const scrollToSection = (id) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            };
+
+            const menuItems = [
+                { label: '主題', id: 'section-hero' },
+                { label: '故事', id: 'section-story' },
+                { label: '蛇', id: 'section-habitat' },
+                { label: '蛇尺', id: 'section-ruler' },
+                { label: '繪本', id: 'section-book' },
+                { label: 'AR', id: 'section-ar' },
+                { label: '拼圖', id: 'section-puzzle' },
+                { label: '願景', id: 'section-vision' },
+                { label: 'APP', id: 'section-app' }
+            ];
+
+            const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+            const handleNavigation = (id) => {
+                // setIsMenuOpen(false); // Keep menu open as requested
+                scrollToSection(id);
+            };
+
+            return (
+                <div className="relative w-full min-h-screen">
+                    <Noise patternSize={230} patternScaleX={1} patternScaleY={1.2} patternRefreshInterval={4} patternAlpha={30} />
+                    <div className="noise-overlay"></div>
+
+                    {/* 開場動畫 (Loading) */}
+                    <div className="intro-overlay fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center">
+                        <img src="./它說字體3外框.png" alt="THE SERPENT'S VOICE" className="intro-text w-64 md:w-96 opacity-0" />
+                    </div>
+
+                    {/* Lanyard Menu Trigger (appears after intro) -> Replaced with Hamburger */}
+                    {!showIntro && (
+                        <MenuButton
+                            isOpen={isMenuOpen}
+                            onClick={toggleMenu}
+                        />
+                    )}
+
+                    {/* Gradient Full Screen Menu */}
+                    <GradientMenuOverlay
+                        isOpen={isMenuOpen}
+                        menuItems={menuItems}
+                        onNavigate={(id) => {
+                            handleNavigation(id);
+                            setIsMenuOpen(false); // Close menu on navigate
+                        }}
+                    />
+
+                    {/* 1. Hero (Interactive Flashlight) */}
+                    <HeroSection />
+
+                    {/* 1.5 Storytelling Section */}
+                    <StorySection />
+
+                    {/* 2. Snake Section (The 7 Snakes) */}
+                    <section id="section-habitat" className="min-h-screen py-20 bg-[#13151A] border-t border-white/5 relative overflow-hidden flex items-center">
+
+                        {/* 背景裝飾：當前蛇的環境色光暈 */}
+                        <div className="absolute inset-0 transition-colors duration-1000 opacity-5"
+                            style={{ backgroundColor: snakes[currentSnake].color }}></div>
+
+                        <div className="container mx-auto px-6 z-10">
+                            <div className="flex flex-col md:flex-row items-stretch justify-center gap-12">
+
+                                {/* 左側：控制與資訊 (Scrollable Info) */}
+                                <ScrollReveal className="w-full md:w-5/12 space-y-8 order-2 md:order-1 flex flex-col justify-center">
+                                    <div key={currentSnake} className="animate-pulse">
+                                        <span className="text-xs font-mono border border-white/30 px-3 py-1 rounded-full text-white/60">
+                                            NO.0{currentSnake + 1}
+                                        </span>
+                                    </div>
+
+                                    <div key={`text-${currentSnake}`}>
+                                        <h2 className="text-4xl md:text-6xl font-bold text-white mb-2 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                                            {snakes[currentSnake].name}
+                                        </h2>
+                                        <p className="text-sm font-mono text-white/40 tracking-widest uppercase mb-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                                            {snakes[currentSnake].eng}
+                                        </p>
+
+                                        {/* 蛇的自我介紹 (Dialogue) */}
+                                        {snakes[currentSnake].intro && (
+                                            <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border-l-4 border-[color:var(--snake-color)] mb-6 animate-slide-up" style={{ '--snake-color': snakes[currentSnake].color, animationDelay: '0.3s' }}>
+                                                <p className="text-gray-300 leading-relaxed text-sm italic">
+                                                    "{snakes[currentSnake].intro}"
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* 觀察檔案 & 戰力分析 (Tabs or Grid) */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                                            {/* 檔案 */}
+                                            <div className="space-y-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+                                                {snakes[currentSnake].features && (
+                                                    <div className="text-sm text-gray-400 space-y-2">
+                                                        <h4 className="text-white font-bold border-b border-white/10 pb-1">🔎 觀察檔案</h4>
+                                                        <p><span className="text-white/60">外號：</span>{snakes[currentSnake].features.nickname}</p>
+                                                        <p><span className="text-white/60">花紋：</span>{snakes[currentSnake].features.pattern}</p>
+                                                        <p><span className="text-white/60">特徵：</span>{snakes[currentSnake].features.body}</p>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center gap-2 text-white/70 text-xs mt-4">
+                                                    <MapPin size={14} />
+                                                    <span>{snakes[currentSnake].habitat}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* 雷達圖 */}
+                                            <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.5s' }}>
+                                                <RadarChart
+                                                    stats={snakes[currentSnake].stats}
+                                                    labels={snakes[currentSnake].statLabels}
+                                                    color={snakes[currentSnake].color}
+                                                />
+                                                <span className="text-[10px] text-gray-500 mt-2 font-mono">戰力分析</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 切換按鈕 */}
+                                    <div className="flex gap-4 pt-4">
+                                        <button onClick={prevSnake} className="p-4 rounded-full border border-white/20 hover:bg-white/10 hover:scale-110 transition-all">
+                                            <ChevronLeft size={24} />
+                                        </button>
+                                        <button onClick={nextSnake} className="p-4 rounded-full border border-white/20 hover:bg-white/10 hover:scale-110 transition-all">
+                                            <ChevronRight size={24} />
+                                        </button>
+                                    </div>
+                                </ScrollReveal>
+
+                                {/* 右側：視覺 (Card / Illustration) */}
+                                <ScrollReveal className="w-full md:w-5/12 aspect-square relative order-1 md:order-2" delay={0.2}>
+                                    <div key={currentSnake} className="card-enter w-full h-full relative group">
+                                        {/* 如果有圖層資料就顯示視差卡片，否則顯示舊的 SVG */}
+                                        {snakes[currentSnake].layers ? (
+                                            <ParallaxCard layers={snakes[currentSnake].layers} />
+                                        ) : (
+                                            <div className="w-full h-full bg-[#1A1C23] rounded-[2rem] p-6 shadow-2xl border border-white/10 relative overflow-hidden">
+                                                <div className="absolute inset-4 border border-white/5 rounded-[1.5rem] pointer-events-none z-20"></div>
+                                                <HabitatIllustration color={snakes[currentSnake].color} index={currentSnake} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </ScrollReveal>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 3. Product: Snake Ruler (Redesigned) */}
+                    <section id="section-ruler" className="product-section min-h-screen flex items-center justify-center py-20 relative border-t border-white/5 overflow-x-auto">
+                        <ScrollReveal className="w-full">
+                            <SnakeRulerEssential
+                                currentSnake={snakes[currentSnake]}
+                                snakes={snakes}
+                                onSwitchSnake={setCurrentSnake}
+                            />
+                        </ScrollReveal>
+                    </section>
+
+                    {/* 4. Product: Story Book (3D Interactive) */}
+                    <BookSection />
+
+                    {/* 5. Product: AR & Puzzle */}
+                    <section id="section-ar" className="product-section min-h-[80vh] flex items-center justify-center py-20 relative border-t border-white/5">
+                        <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-center gap-10">
+                            {/* AR */}
+                            <ScrollReveal className="bg-[#1A1C23] p-8 rounded-[2rem] border border-white/10 flex flex-col items-center">
+                                <ARPhoneGraphic />
+                                <h4 className="text-xl font-bold text-white mt-6 mb-2">AR 探索</h4>
+                                <p className="text-gray-500 text-sm">掃描森林，發現隱藏的蛇類</p>
+                            </ScrollReveal>
+                            {/* Puzzle */}
+                            <ScrollReveal className="bg-[#1A1C23] p-8 rounded-[2rem] border border-white/10 flex flex-col items-center" id="section-puzzle" delay={0.2}>
+                                <PuzzleGraphic />
+                                <h4 className="text-xl font-bold text-white mt-6 mb-2">生態拼圖</h4>
+                                <p className="text-gray-500 text-sm">拼湊棲地，了解生態系</p>
+                            </ScrollReveal>
+                        </div>
+                    </section>
+
+                    {/* 6. APP Download (Forest Translator) */}
+                    <AppDownloadSection />
+
+                    {/* 7. Vision Section (Conclusion) */}
+                    <VisionSection />
+
+                    {/* 8. Footer (Info) */}
+                    <FooterSection />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+</body>
+
+</html>
